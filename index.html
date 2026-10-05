@@ -1,6 +1,10 @@
 <!DOCTYPE html>
-<!-- Quay-Dong-Goi.html — v3.9 · 01/10/2026 15:22 (UTC+7)
+<!-- Quay-Dong-Goi.html — v3.10 · 05/10/2026 16:13 (UTC+7)
      Lịch sử phiên bản (cập nhật dòng version trong <header> mỗi lần sửa):
+     v3.10 (05/10/2026 16:13) — Danh sách camera trước đây chỉ nạp 1 lần lúc mở trang nên bật DroidCam
+       SAU khi mở tool thì không hiện. Nay tự cập nhật khi trình duyệt báo có camera mới (sự kiện
+       devicechange) và có thêm nút "🔄 Làm mới" cạnh ô chọn camera để quét lại bằng tay. Cả hai
+       đều bị khoá khi đang quay để không đổi camera giữa chừng.
      v3.9 (01/10/2026 15:22) — Thêm âm báo khi bấm "Bắt đầu quay" (file người dùng gửi, nhúng
        base64 thẳng trong file), phát ngay lúc bấm nút (sau khi qua các bước kiểm tra hợp lệ như
        camera sẵn sàng, đã nhập mã đơn ở chế độ hoàn trả). Dùng chung mức âm lượng đã cài đặt.
@@ -421,7 +425,7 @@
   <div>
     <h1>Quay Đóng Gói</h1>
     <div class="sub">Bằng chứng đơn hàng — tự tách file theo mã đơn</div>
-    <div class="sub" id="versionTag" style="margin-top:2px;">v3.9 · 01/10/2026 15:22</div>
+    <div class="sub" id="versionTag" style="margin-top:2px;">v3.10 · 05/10/2026 16:13</div>
   </div>
   <div style="display:flex; align-items:center; gap:10px;">
     <button type="button" id="openSettingsBtn" class="status-pill" style="cursor:pointer; background:transparent;">⚙️ Cài đặt</button>
@@ -443,7 +447,10 @@
 
       <div style="margin-bottom:10px;">
         <label>Camera đang dùng</label>
-        <select id="camSelect"><option value="">— Đang tải danh sách camera... —</option></select>
+        <div style="display:flex; gap:8px;">
+          <select id="camSelect" style="margin-bottom:0;"><option value="">— Đang tải danh sách camera... —</option></select>
+          <button type="button" class="btn-ghost" id="refreshCamBtn" style="white-space:nowrap;" title="Quét lại danh sách camera (dùng khi vừa bật DroidCam hoặc cắm camera mới)">🔄 Làm mới</button>
+        </div>
       </div>
 
       <div class="preview-wrap">
@@ -11142,6 +11149,23 @@ self.onmessage = function(e){
   }
   camSelect.addEventListener('change', ()=> switchCamera(camSelect.value));
 
+  // Làm mới danh sách camera: tự chạy khi trình duyệt báo có camera mới cắm/rút (ví dụ vừa bật
+  // DroidCam trên máy tính), và có nút bấm tay dự phòng. Không làm khi đang quay để tránh
+  // vô tình đổi camera giữa chừng.
+  async function refreshCameraList(){
+    if(sessionActive) return;
+    await populateCameraList();
+  }
+  const refreshCamBtn = $('refreshCamBtn');
+  refreshCamBtn.addEventListener('click', async ()=>{
+    refreshCamBtn.disabled = true;
+    await refreshCameraList();
+    refreshCamBtn.disabled = false;
+  });
+  if(navigator.mediaDevices && navigator.mediaDevices.addEventListener){
+    navigator.mediaDevices.addEventListener('devicechange', refreshCameraList);
+  }
+
   function refreshAdvancedControls(){
     advControls.innerHTML = '';
     let any = false;
@@ -11563,6 +11587,7 @@ self.onmessage = function(e){
     modeTabPacking.disabled = true;
     modeTabReturn.disabled = true;
     camSelect.disabled = true;
+    refreshCamBtn.disabled = true;
 
     if(recordMode === 'hoan_tra'){
       returnOrderId.disabled = true;
@@ -11609,6 +11634,7 @@ self.onmessage = function(e){
     modeTabPacking.disabled = false;
     modeTabReturn.disabled = false;
     camSelect.disabled = false;
+    refreshCamBtn.disabled = false;
     returnOrderId.disabled = false;
     returnOrderId.value = '';
     returnTrackingCode.disabled = false;
