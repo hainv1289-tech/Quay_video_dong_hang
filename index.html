@@ -1,6 +1,11 @@
 <!DOCTYPE html>
-<!-- Quay-Dong-Goi.html — v3.10 · 05/10/2026 16:13 (UTC+7)
+<!-- Quay-Dong-Goi.html — v3.11 · 05/10/2026 16:18 (UTC+7)
      Lịch sử phiên bản (cập nhật dòng version trong <header> mỗi lần sửa):
+     v3.11 (05/10/2026 16:18) — Sửa khung hình camera điện thoại (DroidCam...) bị ép gần vuông: trước
+       đây khung xem cố định 4:3 + object-fit cover (cắt hai bên) và luôn xin camera 1280x960.
+       Nay khung xem tự theo đúng tỉ lệ thật của luồng camera (4:3, 16:9, quay dọc), không cắt
+       hình; camera điện thoại/ảo (DroidCam, Iriun, OBS...) xin 16:9 (1280x720), webcam thường
+       giữ 4:3 như cũ.
      v3.10 (05/10/2026 16:13) — Danh sách camera trước đây chỉ nạp 1 lần lúc mở trang nên bật DroidCam
        SAU khi mở tool thì không hiện. Nay tự cập nhật khi trình duyệt báo có camera mới (sự kiện
        devicechange) và có thêm nút "🔄 Làm mới" cạnh ô chọn camera để quét lại bằng tay. Cả hai
@@ -285,7 +290,7 @@
 
   video#preview{
     width:100%; aspect-ratio:4/3; background:#0e0f12; border-radius:4px;
-    border:1px solid var(--line); object-fit:cover; display:block;
+    border:1px solid var(--line); object-fit:contain; display:block; max-height:75vh;
   }
   canvas#scanCanvas{ display:none; }
   video#preview.rotated{ transform: rotate(180deg); }
@@ -425,7 +430,7 @@
   <div>
     <h1>Quay Đóng Gói</h1>
     <div class="sub">Bằng chứng đơn hàng — tự tách file theo mã đơn</div>
-    <div class="sub" id="versionTag" style="margin-top:2px;">v3.10 · 05/10/2026 16:13</div>
+    <div class="sub" id="versionTag" style="margin-top:2px;">v3.11 · 05/10/2026 16:18</div>
   </div>
   <div style="display:flex; align-items:center; gap:10px;">
     <button type="button" id="openSettingsBtn" class="status-pill" style="cursor:pointer; background:transparent;">⚙️ Cài đặt</button>
@@ -11121,13 +11126,32 @@ self.onmessage = function(e){
     }catch(e){ /* không liệt kê được — vẫn dùng camera mặc định bình thường */ }
   }
 
+  // Camera điện thoại / camera ảo (DroidCam, Iriun, OBS...) thường là 16:9 — xin 16:9 để không bị ép
+  // về khung gần vuông. Webcam thường giữ nguyên 4:3 như trước, không đổi hành vi cũ.
+  function videoSizeFor(deviceId){
+    const opt = Array.from(camSelect.options).find(o => o.value === deviceId);
+    const label = opt ? opt.textContent : '';
+    if(/droidcam|iriun|ivcam|epoccam|obs|virtual|phone/i.test(label)){
+      return { width:{ ideal:1280 }, height:{ ideal:720 } };
+    }
+    return { width:1280, height:960 };
+  }
+
+  // Khung xem tự theo đúng tỉ lệ thật của luồng camera đang dùng (4:3, 16:9, hoặc quay dọc...)
+  function syncPreviewAspect(){
+    const w = previewEl.videoWidth, h = previewEl.videoHeight;
+    if(w && h) previewEl.style.aspectRatio = w + ' / ' + h;
+  }
+  previewEl.addEventListener('loadedmetadata', syncPreviewAspect);
+  previewEl.addEventListener('resize', syncPreviewAspect);
+
   async function switchCamera(deviceId){
     if(!deviceId) return;
     camHint.textContent = 'Đang chuyển camera...';
     camHint.style.color = '';
     try{
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId }, width:1280, height:960 },
+        video: Object.assign({ deviceId: { exact: deviceId } }, videoSizeFor(deviceId)),
         audio: true
       });
       // Dừng luồng cũ SAU khi đã có luồng mới thành công — tránh khoảng trống mất camera nếu lỗi
